@@ -1,37 +1,63 @@
 import re
-from typing import Any, Optional
+from typing import Optional
 
 import boto3
 
+from image_processor import ImageProcessor
+
 
 class OCRExtractor:
-    def __init__(self, file_data: Any):
-        self.file_data = file_data
+    def __init__(self):
         self.client = boto3.client('textract')
+        self.results = {
+            "amount": None,
+            "transaction_id": None,
+            "bank_name": None
+        }
 
-    def process_document(self):
+    def process_document(self, im_bytes):
         try:
             # Detect document text using AWS Textract
             result_json = self.client.detect_document_text(
-                Document={'Bytes': self.file_data})
+                Document={'Bytes': im_bytes})
             print(f"result_json : {result_json['Blocks']}")
             return result_json["Blocks"]
         except Exception as e:
             print(f"Error processing document: {e}")
             raise
 
-    def get_extracted_data(self) -> dict:
-        text_blocks = self.process_document()
+    def get_extracted_data(self, file_data) -> dict:
+        try:
+            img_data = file_data.get("image")
 
-        amount = self.extract_amount(text_blocks)
-        transaction_id = self.extract_transaction_id(text_blocks)
-        bank_name = self.extract_bank_name(text_blocks)
+            """Base case with the original image"""
+            im_bytes = ImageProcessor.image_base64_decode(img_data)
+            self.data_Extraction_helper(im_bytes)
 
-        return {
-            "amount": amount,
-            "transaction_id": transaction_id,
-            "bank_name": bank_name
-        }
+            if None in (self.results["amount"], self.results["transaction_id"]):
+                print("Inverting image for better results.")
+                im_bytes = ImageProcessor.invert_image(img_data)
+                self.data_Extraction_helper(im_bytes)
+
+            return self.results
+        except Exception as e:
+            print(f"get_extracted_data Error : {e}")
+            raise
+
+
+    def data_Extraction_helper(self, im_bytes):
+        text_blocks = self.process_document(im_bytes)
+
+        if self.results["amount"] is None:
+            self.results["amount"] = self.extract_amount(text_blocks)
+
+        if self.results["transaction_id"] is None:
+            self.results["transaction_id"] = self.extract_transaction_id(
+                text_blocks)
+
+        if self.results["bank_name"] is None:
+            self.results["bank_name"] = self.extract_bank_name(text_blocks)
+
 
     def extract_amount(self, text_blocks):
         amount = None
@@ -66,6 +92,7 @@ class OCRExtractor:
 
 
     def extract_transaction_id(self, text_blocks):
+        # first preference
         for block in text_blocks:
             if block["BlockType"] != "WORD":
                 continue
@@ -77,7 +104,29 @@ class OCRExtractor:
                 match = re.match(pattern, cleaned_text)
 
                 if match:
-                    return match.group(0) if match else None
+                    return match.group(0).strip()
+
+                pattern = r'UTR:\s*(\s*\d{12})'
+                match = re.search(pattern, cleaned_text)
+                if match:
+                    return match.group(1).strip()
+
+            except Exception as exc:
+                print(f"Error in extract_transaction_id: {exc}")
+
+        # second preference
+        for block in text_blocks:
+            if block["BlockType"] != "LINE":
+                continue
+            try:
+                text = block["Text"]
+                cleaned_text = str(text).replace(" ", "")
+
+                pattern = r'\b[\w\s\.]+:\s*(\d{12})\b'
+                match = re.search(pattern, cleaned_text)
+                if match:
+                    return match.group(1).strip()
+
             except Exception as exc:
                 print(f"Error in extract_transaction_id: {exc}")
 
