@@ -1,42 +1,96 @@
+import base64
 import re
-from csv import excel_tab
-from typing import Any, Optional
+from collections import defaultdict
+from typing import Optional
 
 import boto3
 
+from image_processor import ImageProcessor
+
 
 class OCRExtractor:
-    def __init__(self, file_data: Any):
-        self.file_data = file_data
+    def __init__(self):
         self.client = boto3.client('textract')
-        self.text_blocks = []
         self.results = {
             "amount": None,
             "transaction_id": None
         }
 
-    def process_document(self):
+    def process_document(self, file_data):
         try:
             # Detect document text using AWS Textract
             result_json = self.client.detect_document_text(
-                Document={'Bytes': self.file_data})
-            self.text_blocks = result_json["Blocks"]
-            print(f"text_blocks : {self.text_blocks}")
+                Document={'Bytes': file_data})
+            text_blocks = result_json["Blocks"]
+            print(f"result : {result_json['Blocks']}")
+
+            self.__print_text_blocks(text_blocks)
+            self.__check_confidence(text_blocks)
+
+            return text_blocks
         except Exception as e:
             print(f"Error processing document: {e}")
             raise
 
-    def extract_results(self):
+    def __print_text_blocks(self, text_blocks):
+        text_map = defaultdict(list)
+        for block in text_blocks:
+            if "Text" not in block:
+                continue
+
+            text = block["Text"]
+            block_type = block["BlockType"]
+            text_map[block_type].append(text)
+
+        print(f"text_map : {text_map}")
+
+    def __check_confidence(self, text_blocks):
+        conf_map = defaultdict(list)
+        for block in text_blocks:
+            if "Text" not in block:
+                continue
+            conf = block["Confidence"]
+            text = block.get("Text")
+            if float(conf) > 95:
+                conf_map["High"].append(text)
+            elif float(conf) > 85:
+                conf_map["Medium"].append(text)
+            else:
+                conf_map["Low"].append(text)
+        print(f"conf_map : {conf_map}")
+
+    def extract_results(self, file_data):
+
+        print()
+        print(f"File Name : {file_data.get('file_name')}")
+        data = file_data.get("image")
+
+        """Processing the image as is"""
+        im_bytes = base64.b64decode(data)
+        self.__extract_helper(im_bytes)
+
+        if None in self.results.values():
+            print("Else-2")
+            """Converting image to black and white for better results"""
+            im_bytes = ImageProcessor.convert_image_to_bw_base64(data)
+            self.__extract_helper(im_bytes)
+
+        return self.results
+    
+    def __extract_helper(self, im_bytes):
+        text_blocks = self.process_document(im_bytes)
+
         """Iterating words to find required vals"""
-        self.iterate_words_to_extract_fields()
+        self.iterate_words_to_extract_fields(text_blocks)
 
         if self.results["amount"] is None:
-            self.results["amount"] = self.extract_amount()
+            print("Else")
+            self.results["amount"] = self.extract_amount(text_blocks)
 
         return self.results
 
-    def iterate_words_to_extract_fields(self):
-        for block in self.text_blocks:
+    def iterate_words_to_extract_fields(self, text_blocks):
+        for block in text_blocks:
             if block["BlockType"] != "WORD":
                 continue
 
@@ -73,8 +127,8 @@ class OCRExtractor:
             print(f"Error in extract_transaction_id: {exc}")
             return None
 
-    def extract_amount(self):
-        for block in self.text_blocks:
+    def extract_amount(self, text_blocks):
+        for block in text_blocks:
             if block["BlockType"] not in ("WORD", "LINE"):
                 continue
 
@@ -89,7 +143,8 @@ class OCRExtractor:
                         return amount.group(1)
                 else:
                     amount = re.search(
-                        r'\d{1,3}(?:,\d{1,3})+(?:\.\d{2})?\b|\d+\.\d{2}\b', text)
+                        r'\d{1,3}(?:,\d{1,3})+(?:\.\d{2})?\b|\d+\.\d{2}\b',
+                        text)
                     if amount:
                         return amount.group(0)
             except Exception as exc:

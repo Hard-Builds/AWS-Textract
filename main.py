@@ -5,6 +5,7 @@ import uvicorn
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 
+from image_processor import ImageProcessor
 from ocr_extractor import OCRExtractor
 
 app = FastAPI(
@@ -35,12 +36,8 @@ def ping():
 @app.post("/ocr", tags=["get_ocr"])
 def get_ocr(file_data: Any = Body(None)):
     try:
-        data = file_data.get("image")
-        im_bytes = base64.b64decode(data)
-
-        ocr_extractor = OCRExtractor(im_bytes)
-        ocr_extractor.process_document()
-        results = ocr_extractor.extract_results()
+        ocr_extractor = OCRExtractor()
+        results = ocr_extractor.extract_results(file_data)
 
         return {
             "status": "success",
@@ -55,7 +52,7 @@ def get_ocr(file_data: Any = Body(None)):
 if __name__ == '__main__':
     try:
         print("App server init called")
-        uvicorn.run(app, host="0.0.0.0", port=11000)
+        uvicorn.run(app, host="0.0.0.0", port=1234)
         print("Server started")
     except Exception:
         print("Exception in app start: ")
