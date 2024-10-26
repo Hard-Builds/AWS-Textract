@@ -5,6 +5,20 @@ import boto3
 
 from image_processor import ImageProcessor
 
+timestamp_patterns = [
+    r'\b(\d{1,2}:\d{2}\s*[APMapm]{2}\s+on\s+\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\b',
+    r'(\d{1,2})\s([A-Za-z]+)\s(\d{4})\sat\s(\d{1,2}):(\d{2})\s([APap][Mm])'
+    r'\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s+\d{1,2}:\d{2}\s*[APMapm]{2})\b',
+    r'\b(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})\b',
+    r'\b(\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?)\b',
+    r'\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\b',
+    r'\b(\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}\s*[APMapm]{0,2})\b',
+    r'\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4},?\s+\d{1,2}:\d{2}\s*[APMapm]{2})\b',
+    r'\b(\d{1,2}:\d{2}\s*[APMapm]{2})\b',
+    r'\b(\d{2}:\d{2}:\d{2})\b',
+    r'\b(\d{4}[-/]\d{2}[-/]\d{2})\b',
+    r'\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4},\s+\d{1,2}:\d{2}\s*[APMapm]{2})\b'
+]
 
 class OCRExtractor:
     def __init__(self):
@@ -12,7 +26,8 @@ class OCRExtractor:
         self.results = {
             "amount": None,
             "transaction_id": None,
-            "bank_name": None
+            "bank_name": None,
+            "timestamp": None
         }
 
     def process_document(self, im_bytes):
@@ -59,6 +74,9 @@ class OCRExtractor:
 
         if self.results["bank_name"] is None:
             self.results["bank_name"] = self.extract_bank_name(text_blocks)
+
+        if self.results["timestamp"] is None:
+            self.results["timestamp"] = self.extract_timestamp(text_blocks)
 
 
     def extract_amount(self, text_blocks):
@@ -178,3 +196,25 @@ class OCRExtractor:
                     return block["Text"]
             except Exception as exc:
                 print(f"extract_bank_name Error : {exc}")
+
+    def extract_timestamp(self, text_blocks):
+        try:
+            timestamps = []
+            for block in text_blocks:
+                if block["BlockType"] != "LINE":
+                    continue
+
+                try:
+                    text = str(block["Text"])
+
+                    for pattern in timestamp_patterns:
+                        match = re.findall(pattern, text)
+                        if match:
+                            timestamps.append(" ".join(match))
+
+                except Exception as exc:
+                    print(f"extract_bank_name Error : {exc}")
+
+            return max(timestamps, key=len)
+        except Exception as exc:
+            print(f"extract_bank_name Error : {exc}")
