@@ -22,12 +22,15 @@ class OCRExtractor:
 
     def get_extracted_data(self) -> dict:
         text_blocks = self.process_document()
+
         amount = self.extract_amount(text_blocks)
         transaction_id = self.extract_transaction_id(text_blocks)
+        bank_name = self.extract_bank_name(text_blocks)
 
         return {
             "amount": amount,
-            "transaction_id": transaction_id
+            "transaction_id": transaction_id,
+            "bank_name": bank_name
         }
 
     def extract_amount(self, text_blocks):
@@ -58,10 +61,8 @@ class OCRExtractor:
                 amount_str = amount_match.group(1).replace(",", "").replace(
                     " ", "")
                 return float(amount_str)
-            return None
         except Exception as exc:
             print(f"Error in extract_rupee: {exc}")
-            return None
 
 
     def extract_transaction_id(self, text_blocks):
@@ -79,7 +80,6 @@ class OCRExtractor:
                     return match.group(0) if match else None
             except Exception as exc:
                 print(f"Error in extract_transaction_id: {exc}")
-                return None
 
     def extract_fallback_amount(self, text_blocks):
         for block in text_blocks:
@@ -113,5 +113,17 @@ class OCRExtractor:
                     return amount.group(0)
                 '''
             except Exception as exc:
-                print(f"Error : {exc}")
-                return None
+                print(f"extract_fallback_amount Error : {exc}")
+
+    def extract_bank_name(self, text_blocks):
+        for block in text_blocks:
+            if block["BlockType"] != "LINE":
+                continue
+
+            try:
+                text = str(block["Text"])
+                if re.search(r'\b\w+\s+bank\b|\bbank\s+\w+\b', text,
+                             re.IGNORECASE):
+                    return block["Text"]
+            except Exception as exc:
+                print(f"extract_bank_name Error : {exc}")
