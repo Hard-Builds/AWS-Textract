@@ -35,12 +35,10 @@ def ping():
 @app.post("/ocr", tags=["get_ocr"])
 def get_ocr(file_data: Any = Body(None)):
     try:
-        data = file_data.get("image")
-        im_bytes = base64.b64decode(data)
+        print(f'file_name : {file_data.get("file_name")}')
 
-        ocr_extractor = OCRExtractor(im_bytes)
-        ocr_extractor.process_document()
-        results = ocr_extractor.extract_results()
+        ocr_extractor = OCRExtractor()
+        results = ocr_extractor.get_extracted_data(file_data)
 
         return {
             "status": "success",
