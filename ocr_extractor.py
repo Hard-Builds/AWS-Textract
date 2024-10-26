@@ -36,8 +36,10 @@ class OCRExtractor:
 
             if None in (self.results["amount"], self.results["transaction_id"]):
                 print("Inverting image for better results.")
+                print(f"Current results : {self.results}")
                 im_bytes = ImageProcessor.invert_image(img_data)
                 self.data_Extraction_helper(im_bytes)
+                print(f"Updated results : {self.results}")
 
             return self.results
         except Exception as e:
