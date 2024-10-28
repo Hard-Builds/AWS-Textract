@@ -1,6 +1,9 @@
 # Use an official Python runtime as a parent image
 FROM python:3.12-slim
 
+# Set environment variables
+ENV AWS_REGION=us-east-1
+
 # Set the working directory in the container
 WORKDIR /app
 
