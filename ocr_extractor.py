@@ -33,35 +33,27 @@ class OCRExtractor:
         }
 
     def process_document(self, im_bytes):
-        try:
-            # Detect document text using AWS Textract
-            result_json = self.client.detect_document_text(
-                Document={'Bytes': im_bytes})
-            print(f"result_json : {result_json['Blocks']}")
-            return result_json["Blocks"]
-        except Exception as e:
-            print(f"Error processing document: {e}")
-            raise
+        # Detect document text using AWS Textract
+        result_json = self.client.detect_document_text(
+            Document={'Bytes': im_bytes})
+        print(f"result_json : {result_json['Blocks']}")
+        return result_json["Blocks"]
 
     def get_extracted_data(self, file_data) -> dict:
-        try:
-            img_data = file_data.get("image")
+        img_data = file_data.get("image")
 
-            """Base case with the original image"""
-            im_bytes = ImageProcessor.image_base64_decode(img_data)
+        """Base case with the original image"""
+        im_bytes = ImageProcessor.image_base64_decode(img_data)
+        self.data_Extraction_helper(im_bytes)
+
+        if None in (self.results["amount"], self.results["transaction_id"]):
+            print("Inverting image for better results.")
+            print(f"Current results : {self.results}")
+            im_bytes = ImageProcessor.invert_image(img_data)
             self.data_Extraction_helper(im_bytes)
+            print(f"Updated results : {self.results}")
 
-            if None in (self.results["amount"], self.results["transaction_id"]):
-                print("Inverting image for better results.")
-                print(f"Current results : {self.results}")
-                im_bytes = ImageProcessor.invert_image(img_data)
-                self.data_Extraction_helper(im_bytes)
-                print(f"Updated results : {self.results}")
-
-            return self.results
-        except Exception as e:
-            print(f"get_extracted_data Error : {e}")
-            raise
+        return self.results
 
 
     def data_Extraction_helper(self, im_bytes):

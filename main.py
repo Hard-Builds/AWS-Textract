@@ -34,18 +34,13 @@ def ping():
 
 @app.post("/ocr", tags=["get_ocr"])
 def get_ocr(file_data: Any = Body(None)):
-    try:
-        ocr_extractor = OCRExtractor()
-        results = ocr_extractor.get_extracted_data(file_data)
-        print(f"results : {results}")
-        return {
-            "status": "success",
-            "data": results
-        }
-    except Exception as e:
-        # Log and handle any other errors
-        print(f"Error: {e}")
-        return {"status": "failure", "data": "Something went wrong"}
+    ocr_extractor = OCRExtractor()
+    results = ocr_extractor.get_extracted_data(file_data)
+    print(f"results : {results}")
+    return {
+        "status": "success",
+        "data": results
+    }
 
 
 if __name__ == '__main__':
