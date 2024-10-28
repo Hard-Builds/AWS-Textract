@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables
-IMAGE_NAME="ocrImage"
+IMAGE_NAME="ocr_image"
 CONTAINER_NAME="ocr_image_container"
 PORT_MAPPING="8000:8000"  # Map host port 8000 to container port 8000, modify if needed
 DOCKERFILE_PATH="./Dockerfile"  # Assuming Dockerfile is in the current directory
